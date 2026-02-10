@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Namenslernspiel mit Trainingsmodus</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f8f8f8;
+      padding: 20px;
+    }
+
+    #dropzone {
+      border: 2px dashed #aaa;
+      padding: 30px;
+      margin-bottom: 20px;
+      color: #666;
+    }
+
+    #buttons {
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      margin: 0 10px 10px 10px;
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    #frage {
+      font-size: 1.3em;
+      font-weight: bold;
+      margin: 10px 0;
+      color: #333;
+    }
+
+    #feedback {
+      margin-bottom: 20px;
+      font-size: 1.1em;
+    }
+
+    #cards {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .card {
+      width: 150px;
+      height: 200px;
+      perspective: 1000px;
+    }
+
+    .inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.6s;
+      cursor: pointer;
+    }
+
+    .card.flipped .inner {
+      transform: rotateY(180deg);
+    }
+
+    .front, .back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+    }
+
+    .front img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .back {
+      background: repeating-radial-gradient(circle at center, #f0f0f0, #f0f0f0 10px, #ffffff 10px, #ffffff 20px),
+                  linear-gradient(135deg, #8ec5fc, #e0c3fc);
+      transform: rotateY(180deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      color: #222;
+      font-weight: bold;
+      text-shadow: 1px 1px white;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Ziehe Schülerfotos <strong>oder eine ZIP-Datei</strong> hierher 👇</h2>
+<div id="dropzone">
+  📂 Unterstützt: <code>Nachname-Vorname.jpg</code> oder ZIP
+  <br><br>
+  <label id="uploadBtn" style="display:inline-block;padding:10px 20px;background:#4caf50;color:#fff;border-radius:8px;cursor:pointer;font-size:1em;">📁 Datei auswählen
+    <input type="file" id="fileInput" accept=".zip,.jpg,.jpeg,.png" multiple style="display:none;">
+  </label>
+</div>
+
+<div id="buttons" style="display:none;">
+  <button id="shuffleButton">🔄 Neu mischen</button>
+  <button id="trainButton">🎯 Trainingsmodus starten</button>
+</div>
+
+<div id="frage"></div>
+<div id="feedback"></div>
+<div id="cards"></div>
+
+<script>
+  const dropzone = document.getElementById("dropzone");
+  const cardsContainer = document.getElementById("cards");
+  const shuffleButton = document.getElementById("shuffleButton");
+  const trainButton = document.getElementById("trainButton");
+  const buttons = document.getElementById("buttons");
+  const frage = document.getElementById("frage");
+  const feedback = document.getElementById("feedback");
+
+  let gespeicherteKarten = [];
+  let trainingsReihenfolge = [];
+  let aktuellerName = null;
+  let imTrainingsmodus = false;
+  let klickSperre = false;
+
+  function formatName(filename) {
+    const base = filename.replace(/\.[^/.]+$/, "");
+    const parts = base.split("-");
+    if (parts.length === 2) {
+      const [nachname, vorname] = parts;
+      return `${capitalize(vorname)} ${capitalize(nachname)}`;
+    } else {
+      return capitalize(base);
+    }
+  }
+
+  function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  }
+
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  function zeigeKarten(karten) {
+    cardsContainer.innerHTML = "";
+    karten.forEach(c => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="inner">
+          <div class="front"><img src="${c.url}" alt="${c.name}"></div>
+          <div class="back">${c.name}</div>
+        </div>
+      `;
+
+      card.addEventListener("click", () => {
+        if (klickSperre || card.classList.contains("flipped")) return;
+
+        card.classList.add("flipped");
+
+        if (imTrainingsmodus && aktuellerName) {
+          klickSperre = true;
+          const geklickterName = c.name;
+
+          if (geklickterName === aktuellerName) {
+            feedback.textContent = "✅ Richtig!";
+            feedback.style.color = "green";
+            aktuellerName = null;
+            setTimeout(() => {
+              klickSperre = false;
+              naechsteFrage();
+            }, 1000);
+          } else {
+            feedback.textContent = `❌ Falsch! Das war ${geklickterName}`;
+            feedback.style.color = "red";
+            trainingsReihenfolge.unshift(aktuellerName);
+            aktuellerName = null;
+
+            // Karte wieder zurückdrehen
+            setTimeout(() => {
+              card.classList.remove("flipped");
+              klickSperre = false;
+              naechsteFrage();
+            }, 1000);
+          }
+        }
+      });
+
+      cardsContainer.appendChild(card);
+    });
+  }
+
+  function starteTraining() {
+    imTrainingsmodus = true;
+    trainingsReihenfolge = [...gespeicherteKarten.map(c => c.name)];
+    shuffle(trainingsReihenfolge);
+    frage.style.display = "block";
+    feedback.textContent = "";
+    naechsteFrage();
+  }
+
+  function naechsteFrage() {
+    if (trainingsReihenfolge.length === 0) {
+      frage.textContent = "🎉 Super! Du hast alle richtig erkannt!";
+      feedback.textContent = "";
+      aktuellerName = null;
+      imTrainingsmodus = false;
+      return;
+    }
+
+    aktuellerName = trainingsReihenfolge.pop();
+    frage.textContent = `Wer ist: ${aktuellerName}?`;
+    feedback.textContent = "";
+  }
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = "green";
+  });
+
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.style.borderColor = "#aaa";
+  });
+
+  async function verarbeiteDateien(files) {
+    let karten = [];
+
+    const zipFile = files.find(f => f.name.toLowerCase().endsWith(".zip"));
+    if (zipFile) {
+      const zip = await JSZip.loadAsync(zipFile);
+      const imageFiles = Object.keys(zip.files).filter(name => /\.(jpg|jpeg|png)$/i.test(name));
+
+      for (const name of imageFiles) {
+        const blob = await zip.files[name].async("blob");
+        const url = URL.createObjectURL(blob);
+        const label = formatName(name);
+        karten.push({ name: label, url });
+      }
+    } else {
+      const imageFiles = files.filter(file => file.type.startsWith("image/"));
+      karten = imageFiles.map(file => ({
+        name: formatName(file.name),
+        url: URL.createObjectURL(file)
+      }));
+    }
+
+    if (karten.length === 0) {
+      alert("Keine gültigen Bilder gefunden.");
+      return;
+    }
+
+    gespeicherteKarten = karten;
+    shuffle(gespeicherteKarten);
+    zeigeKarten(gespeicherteKarten);
+    buttons.style.display = "block";
+    frage.textContent = "";
+    feedback.textContent = "";
+  }
+
+  dropzone.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = "#aaa";
+    await verarbeiteDateien(Array.from(e.dataTransfer.files || []));
+  });
+
+  document.getElementById("fileInput").addEventListener("change", async (e) => {
+    await verarbeiteDateien(Array.from(e.target.files || []));
+    e.target.value = ""; // Reset, damit dieselbe Datei erneut geladen werden kann
+  });
+
+  shuffleButton.addEventListener("click", () => {
+    shuffle(gespeicherteKarten);
+    zeigeKarten(gespeicherteKarten);
+    frage.textContent = "";
+    feedback.textContent = "";
+  });
+
+  trainButton.addEventListener("click", () => {
+    starteTraining();
+  });
+</script>
+
+</body>
+</html>
