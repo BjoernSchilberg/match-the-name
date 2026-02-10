@@ -176,8 +176,14 @@
       `;
 
       card.addEventListener("click", () => {
-        if (klickSperre || card.classList.contains("flipped")) return;
+        if (klickSperre) return;
 
+        if (!imTrainingsmodus) {
+          card.classList.toggle("flipped");
+          return;
+        }
+
+        if (card.classList.contains("flipped")) return;
         card.classList.add("flipped");
 
         if (imTrainingsmodus && aktuellerName) {
