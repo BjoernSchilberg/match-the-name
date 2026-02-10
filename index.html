@@ -92,6 +92,32 @@
       object-fit: cover;
     }
 
+    .hint-icon {
+      display: inline-block;
+      cursor: help;
+      font-size: 0.7em;
+      vertical-align: super;
+      position: relative;
+    }
+
+    .hint-icon:hover::after {
+      content: attr(title);
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 1.8em;
+      background: #333;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      white-space: nowrap;
+      font-size: 0.85rem;
+      font-weight: normal;
+      z-index: 10;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
     .back {
       background: repeating-radial-gradient(circle at center, #f0f0f0, #f0f0f0 10px, #ffffff 10px, #ffffff 20px),
                   linear-gradient(135deg, #8ec5fc, #e0c3fc);
@@ -108,10 +134,9 @@
 </head>
 <body>
 
-<h2>Ziehe Schülerfotos <strong>oder eine ZIP-Datei</strong> hierher 👇</h2>
+<h2>Ziehe Schülerfotos<span class="hint-icon" title="Unterstützt: Nachname-Vorname.jpg">&#128712;</span> oder eine ZIP-Datei hierher
+  👇</h2>
 <div id="dropzone">
-  📂 Unterstützt: <code>Nachname-Vorname.jpg</code> oder ZIP
-  <br><br>
   <label id="uploadBtn" style="display:inline-block;padding:10px 20px;background:#4caf50;color:#fff;border-radius:8px;cursor:pointer;font-size:1em;">📁 Datei auswählen
     <input type="file" id="fileInput" accept=".zip,.jpg,.jpeg,.png" multiple style="display:none;">
   </label>
