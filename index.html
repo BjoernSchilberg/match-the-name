@@ -243,7 +243,20 @@
     });
   }
 
+  function beendeTraining() {
+    imTrainingsmodus = false;
+    aktuellerName = null;
+    trainingsReihenfolge = [];
+    frage.textContent = "";
+    feedback.textContent = "";
+    trainButton.textContent = "🎯 Trainingsmodus starten";
+    // Alle Karten zurückdrehen
+    document.querySelectorAll(".card.flipped").forEach(c => c.classList.remove("flipped"));
+  }
+
   function starteTraining() {
+    // Alle Karten zurückdrehen
+    document.querySelectorAll(".card.flipped").forEach(c => c.classList.remove("flipped"));
     imTrainingsmodus = true;
     trainingsReihenfolge = [...gespeicherteKarten.map(c => c.name)];
     shuffle(trainingsReihenfolge);
@@ -258,6 +271,7 @@
       feedback.textContent = "";
       aktuellerName = null;
       imTrainingsmodus = false;
+      trainButton.textContent = "🎯 Trainingsmodus starten";
       return;
     }
 
@@ -329,7 +343,12 @@
   });
 
   trainButton.addEventListener("click", () => {
-    starteTraining();
+    if (imTrainingsmodus) {
+      beendeTraining();
+    } else {
+      starteTraining();
+      trainButton.textContent = "🛑 Trainingsmodus beenden";
+    }
   });
 </script>
 
